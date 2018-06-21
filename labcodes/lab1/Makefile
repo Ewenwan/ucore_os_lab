@@ -1,3 +1,7 @@
+# 变量定义 ( = or := )
+# 其中 = 和 := 的区别在于, 
+# := 只能使用前面定义好的变量, = 可以使用后面定义的变量
+# +=变量追加值 SRCS += programD.c
 PROJ	:= challenge
 EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
@@ -43,7 +47,7 @@ endif
 # delete target files if there is an error (or make is interrupted)
 .DELETE_ON_ERROR:
 
-# define compiler and flags
+# define compiler and flags 编译器和编译选项
 ifndef  USELLVM
 HOSTCC		:= gcc
 HOSTCFLAGS	:= -g -Wall -O2
@@ -58,6 +62,7 @@ CFLAGS	:= -fno-builtin -Wall -g -m32 -mno-sse -nostdinc $(DEFS)
 CFLAGS	+= $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 endif
 
+# .c文件 .S汇编文件
 CTYPE	:= c S
 
 LD      := $(GCCPREFIX)ld
@@ -66,24 +71,25 @@ LDFLAGS	+= -nostdlib
 
 OBJCOPY := $(GCCPREFIX)objcopy
 OBJDUMP := $(GCCPREFIX)objdump
+# shell 指令
+COPY	:= cp#复制
+MKDIR   := mkdir -p#创建文件夹
+MV	:= mv      #移动文件
+RM	:= rm -f   #删除文件 
+AWK	:= awk     #逐行逐列处理
+SED	:= sed     #sed常常一整行处理
+SH	:= sh      #bash解析命令
+TR	:= tr      #对来自标准输入的字符进行替换、压缩和删除
+TOUCH	:= touch -c#-c 如果文件不存在,则不要进行创建
 
-COPY	:= cp
-MKDIR   := mkdir -p
-MV		:= mv
-RM		:= rm -f
-AWK		:= awk
-SED		:= sed
-SH		:= sh
-TR		:= tr
-TOUCH	:= touch -c
-
-OBJDIR	:= obj
-BINDIR	:= bin
+OBJDIR	:= obj# 目标地址目标
+BINDIR	:= bin# 二进制文件地址
 
 ALLOBJS	:=
 ALLDEPS	:=
 TARGETS	:=
 
+#包含另外一个Makefile文件
 include tools/function.mk
 
 listf_cc = $(call listf,$(1),$(CTYPE))
@@ -107,7 +113,8 @@ match = $(shell echo $(2) | $(AWK) '{for(i=1;i<=NF;i++){if(match("$(1)","^"$$(i)
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # include kernel/user
-
+#库文件 
+# +=变量追加值
 INCLUDE	+= libs/
 
 CFLAGS	+= $(addprefix -I,$(INCLUDE))
@@ -120,16 +127,16 @@ $(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
 # kernel
 
 KINCLUDE	+= kern/debug/ \
-			   kern/driver/ \
-			   kern/trap/ \
-			   kern/mm/
+		   kern/driver/ \
+		   kern/trap/ \
+		   kern/mm/
 
 KSRCDIR		+= kern/init \
-			   kern/libs \
-			   kern/debug \
-			   kern/driver \
-			   kern/trap \
-			   kern/mm
+		   kern/libs \
+		   kern/debug \
+		   kern/driver \
+		   kern/trap \
+		   kern/mm
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
@@ -137,11 +144,13 @@ $(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 
 KOBJS	= $(call read_packet,kernel libs)
 
-# create kernel target
+# create kernel target  系统内核 kernel
 kernel = $(call totarget,kernel)
 
 $(kernel): tools/kernel.ld
-
+# 命令前缀 
+# 前缀 @   :: 只输出命令执行的结果, 出错的话停止执行
+# 前缀 -   :: 命令执行有错的话, 忽略错误, 继续执行
 $(kernel): $(KOBJS)
 	@echo + ld $@
 	$(V)$(LD) $(LDFLAGS) -T tools/kernel.ld -o $@ $(KOBJS)
@@ -152,8 +161,8 @@ $(call create_target,kernel)
 
 # -------------------------------------------------------------------
 
-# create bootblock
-bootfiles = $(call listf_cc,boot)
+# create bootblock 引导区
+bootfiles = $(call listf_cc,boot)# boot　下的文件 
 $(foreach f,$(bootfiles),$(call cc_compile,$(f),$(CC),$(CFLAGS) -Os -nostdinc))
 
 bootblock = $(call totarget,bootblock)
@@ -169,13 +178,13 @@ $(call create_target,bootblock)
 
 # -------------------------------------------------------------------
 
-# create 'sign' tools
+# create 'sign' tools　创建符合规定的硬盘引导扇区　 bootblock.out + 0x55AA -> bootblock (512字节)
 $(call add_files_host,tools/sign.c,sign,sign)
 $(call create_target_host,sign,sign)
 
 # -------------------------------------------------------------------
 
-# create ucore.img
+# create ucore.img　　创建虚拟硬盘文件　引导扇区bootblock + 系统内核kernel -> ucore.img
 UCOREIMG	:= $(call totarget,ucore.img)
 
 $(UCOREIMG): $(kernel) $(bootblock)
@@ -190,11 +199,11 @@ $(call create_target,ucore.img)
 $(call finish_all)
 
 IGNORE_ALLDEPS	= clean \
-				  dist-clean \
-				  grade \
-				  touch \
-				  print-.+ \
-				  handin
+		  dist-clean \
+		  grade \
+		  touch \
+		  print-.+ \
+		  handin
 
 ifeq ($(call match,$(MAKECMDGOALS),$(IGNORE_ALLDEPS)),0)
 -include $(ALLDEPS)
@@ -209,13 +218,23 @@ TARGETS: $(TARGETS)
 .PHONY: qemu qemu-nox debug debug-nox
 qemu-mon: $(UCOREIMG)
 	$(V)$(QEMU)  -no-reboot -monitor stdio -hda $< -serial null
+	
+# make qemu 直接在硬件模拟器上运行
 qemu: $(UCOREIMG)
 	$(V)$(QEMU) -no-reboot -parallel stdio -hda $< -serial null
+	
 log: $(UCOREIMG)
 	$(V)$(QEMU) -no-reboot -d int,cpu_reset  -D q.log -parallel stdio -hda $< -serial null
 qemu-nox: $(UCOREIMG)
 	$(V)$(QEMU)   -no-reboot -serial mon:stdio -hda $< -nographic
 TERMINAL        :=gnome-terminal
+
+# make debug 来调试
+# 需要安装 cgdb  apt-get install cgdb
+# 利用make debug来观察BIOS的单步执行
+# 首先是对qemu进行的操作
+# sleep 2　等待一段时间
+# 针对gdbinit文件进行的调试
 debug: $(UCOREIMG)
 	$(V)$(QEMU) -S -s -parallel stdio -hda $< -serial null &
 	$(V)sleep 2
@@ -247,6 +266,7 @@ print-%:
 	@echo $($(shell echo $(patsubst print-%,%,$@) | $(TR) [a-z] [A-Z]))
 
 .PHONY: clean dist-clean handin packall tags
+# 清理
 clean:
 	$(V)$(RM) $(GRADE_GDB_IN) $(GRADE_QEMU_OUT) cscope* tags
 	-$(RM) -r $(OBJDIR) $(BINDIR)
